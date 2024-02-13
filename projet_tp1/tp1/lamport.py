@@ -15,6 +15,7 @@ from typing import Self
 
 import hashlib
 import secrets
+import sys
 
 
 class Block:
@@ -178,47 +179,42 @@ class Sig:
 class Lamport:
     @classmethod
     def generate_keys(cls) -> tuple[SecretKey, PublicKey]:
-        """
-        Ne prend aucun argument et retourne une paire de clés.
-        Elle obtient le caractère aléatoire du système d'exploitation
-        via le module secrets.
-        """
         sk = SecretKey()
         pk = PublicKey()
 
-        # -----
-        # TODO: Votre code ici...
-        # ----
+        for i in range(256):
+            sk.zero_pre[i] = secrets.token_bytes(32)
+            sk.one_pre[i] = secrets.token_bytes(32)
+
+            pk.zero_hash[i] = hashlib.sha256(sk.zero_pre[i]).digest()
+            pk.one_hash[i] = hashlib.sha256(sk.one_pre[i]).digest()
 
         return sk, pk
 
     @classmethod
     def sign(cls, msg: Message, sk: SecretKey) -> Sig:
-        """
-        Reçoit en entrée un message et une clé secrète et retourne une signature.
-        """
         sig = Sig()
 
-        # -----
-        # TODO: Votre code ici...
-        # ----
-        # Astuce: msg.data[i // 8] >> (7 - (i % 8)) & 1
+        hash_data = msg.hash_data()
+        for i in range(256):
+            b = hash_data[i // 8] >> (7 - (i % 8)) & 1
+            if b == 0:
+                sig.preimage[i] = sk.zero_pre[i]
+            else:
+                sig.preimage[i] = sk.one_pre[i]
 
         return sig
 
     @classmethod
     def verify(cls, msg: Message, pk: PublicKey, sig: Sig) -> bool:
-        """
-        Reçoit en entrée un message, une clé publique et une signature,
-        et retourne un booléen décrivant la validité de la signature.
-        """
-
-        # -----
-        # TODO: Votre code ici...
-        # ----
-        # Astuce: msg.data[i // 8] >> (7 - (i % 8)) & 1
-
-        return False
+        hash_data = msg.hash_data()
+        for i in range(256):
+            b = hash_data[i // 8] >> (7 - (i % 8)) & 1
+            if hashlib.sha256(sig.preimage[i]).digest() != pk.zero_hash[i] and b == 0:
+                return False
+            if hashlib.sha256(sig.preimage[i]).digest() != pk.one_hash[i] and b == 1:
+                return False
+        return True
 
 
 if __name__ == "__main__":
